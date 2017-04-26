@@ -1,0 +1,19 @@
+<config>
+	<server-origin>
+		<ip>177.47.30.154</ip>
+	    <user>oaz</user>
+	    <password>liguetaxima</password>
+	    <database>taxidigital_oaz</database>
+	</server-origin>
+
+	<server-destiny>
+		<ip>localhost</ip>
+	    <user>postgres</user>
+	    <password>postgres</password>
+	    <database>liguetaxi</database>
+	</server-destiny>
+
+	<time-to-update>2</time-to-update>
+	<default-pa>1</default-pa>
+	<default-user>1</default-user>
+</config>
