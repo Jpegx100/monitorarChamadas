@@ -139,6 +139,7 @@ def insert_data_in_db(rows, server, ponto_apoio_default, usuario_atend_default):
 		if(not id_chamada_duplicada(server, str(row["cdChamado"]))):
 			try:
 				chamada_id = str(get_next_chamada_id(server))
+				# In case of call been canceled
 				if row["dataCanc"]!=None:                                                
 					cursor.execute("INSERT INTO chamadas("+fields+', "dataCanc", "horaCanc"' +") VALUES ("+chamada_id+","+
 						row["fone"]+",'"+row["nome"]+"','"+row["logradouro"]+"','"+row["referencia"]+"',"+
@@ -148,6 +149,7 @@ def insert_data_in_db(rows, server, ponto_apoio_default, usuario_atend_default):
 						str(row["longitude"])+", "+str(row["cdChamado"])+", "+str(row["idUnidade"])+","+
 						str(usuario_atend_default)+", 'N', 'N', 'F', "+str(ponto_apoio_default)+",'"+str(row["dataCanc"])+"',"+
 						row["horaCanc"]+");")
+				# In case of call been finalized
 				else:                                            
 					cursor.execute("INSERT INTO chamadas("+fields+") VALUES ("+chamada_id+","+
 						row["fone"]+",'"+row["nome"]+"','"+row["logradouro"]+"','"+row["referencia"]+"',"+
@@ -159,7 +161,13 @@ def insert_data_in_db(rows, server, ponto_apoio_default, usuario_atend_default):
 			except Exception as e:
 				print(e)
 		else:
-			print("Chamado "+str(row['cdChamado'])+" duplicado não foi inserido.")
+			chamada_duplicada = get_chamada(server, str(row["cdChamado"]))
+			chamada_id = str(get_next_chamada_id(server))
+			# In case of call was Canceled and will be Finalized
+			if (chamada_duplicada[0][9]=='C') and (row["situacao"]=='P'):
+				cursor.execute("UPDATE chamadas SET situacao='"+row["situacao"]+' WHERE "idUnidade"='+str(row["idUnidade"])+");")
+			else:
+				print("Chamado "+str(row['cdChamado'])+" duplicado não foi inserido.")
 
 	conn.commit()
 	conn.close()
@@ -256,10 +264,19 @@ def get_last_id_from_view(server):
 	)
 	cursor = conn.cursor()
 	cursor.execute("SELECT MAX(cdChamado) FROM [taxidigital_oaz].[dbo].[300_VwLstChamado]")
-	return [r for r in cursor]
+	return cursor.fetchone()
 
 def show(data):
 	for x in data:
 		print(x['dsStatus'])
+
+def get_chamada(server, taxi_digital_id):
+	conn = get_connection(server)
+	cursor = conn.cursor()
+	cursor.execute("SELECT * from chamadas where id_chamado_digital="+taxi_digital_id+";")
+	row = [r for r in cursor]
+	return row
+        
 if __name__ == "__main__":
  	main()
+#configs = load_config()
