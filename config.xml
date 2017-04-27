@@ -7,10 +7,10 @@
 	</server-origin>
 
 	<server-destiny>
-		<ip>localhost</ip>
+		<ip>187.110.228.236</ip>
 	    <user>postgres</user>
-	    <password>postgres</password>
-	    <database>liguetaxi</database>
+	    <password>admg2</password>
+	    <database>faturamento</database>
 	</server-destiny>
 
 	<time-to-update>10</time-to-update>
