@@ -12,22 +12,22 @@ def main():
 def update_database(server_origin, server_destiny, time_to_update, last_date, default_pa, default_user):
 	data = get_data_from_view(last_date, server_origin)
 	ids = [r['cdChamado'] for r in data]
-	print(str(len(ids))+" Chamadados encontrados: "+str(ids))
+	print(str(len(ids))+" Chamadados encontrados")
 	
 	mapped_data = map_data(data, server_destiny)
 	ids = [r['cdChamado'] for r in mapped_data]
 	datas = [int(r['dtOver'].strftime("%s"))*1000 for r in mapped_data]
-	print(str(len(ids))+" Chamadados validos: "+str(ids))
-	print("Datas: "+str(datas))
+	print(str(len(ids))+" Chamadados validos")
+	#print("Datas: "+str(datas))
 	
 	insert_data_in_db(mapped_data, server_destiny, default_pa, default_user)
 	new_last_date = max_date(mapped_data, 'dtOver')
 	save_last_date(new_last_date)
-	print("Maior data: "+str(new_last_date))
+	#print("Maior data: "+str(new_last_date))
 	print("CONCLUIDO CICLO")
 	new_last_date = datetime.fromtimestamp(int(new_last_date) / 1000.0)
 
-	print(get_last_id_from_view(server_origin))
+	#print(get_last_id_from_view(server_origin))
 	threading.Timer(time_to_update, update_database, [server_origin, server_destiny, time_to_update, new_last_date, default_pa, default_user]).start()
 
 def max_date(rows, key):
@@ -134,11 +134,12 @@ def insert_data_in_db(rows, server, ponto_apoio_default, usuario_atend_default):
 	cursor = conn.cursor()
 	fields = 'id, fone, nome, logradouro, referencia, "dataChamada", "horaChamada", "dataSolicitacao",'+\
 			'"horaSolicitacao", complemento, bairro, situacao, latitude, longitude, "id_chamado_digital", "idUnidade", ' +\
-			' "idUsuarioAtend", solicitada, passagem, status, "idPontoApoio"'
+			' "idUsuarioAtend", solicitada, passagem, status, "idPontoApoio", bandeira'
 	for row in rows:
 		if(not id_chamada_duplicada(server, str(row["cdChamado"]))):
 			try:
 				chamada_id = str(get_next_chamada_id(server))
+				bandeira = get_bandeira(server, row["dataChamada"], row["horaSolicitacao"][:4])
 				# In case of call been canceled
 				if row["dataCanc"]!=None:                                                
 					cursor.execute("INSERT INTO chamadas("+fields+', "dataCanc", "horaCanc"' +") VALUES ("+chamada_id+","+
@@ -147,7 +148,7 @@ def insert_data_in_db(rows, server, ponto_apoio_default, usuario_atend_default):
                                                 row["dataSolicitacao"].strftime("'%Y-%m-%d'")+","+row["horaSolicitacao"]+",'"+
 						row["complemento"]+"','"+row["bairro"]+"','"+row["situacao"]+"',"+str(row["latitude"])+","+
 						str(row["longitude"])+", "+str(row["cdChamado"])+", "+str(row["idUnidade"])+","+
-						str(usuario_atend_default)+", 'N', 'N', 'F', "+str(ponto_apoio_default)+",'"+str(row["dataCanc"])+"',"+
+						str(usuario_atend_default)+", 'N', 'N', 'F', "+str(ponto_apoio_default)+",'"+bandeira+"','"+str(row["dataCanc"])+"',"+
 						row["horaCanc"]+");")
 				# In case of call been finalized
 				else:                                            
@@ -157,7 +158,7 @@ def insert_data_in_db(rows, server, ponto_apoio_default, usuario_atend_default):
                                                 row["dataSolicitacao"].strftime("'%Y-%m-%d'")+","+row["horaSolicitacao"]+",'"+
 						row["complemento"]+"','"+row["bairro"]+"','"+row["situacao"]+"',"+str(row["latitude"])+","+
 						str(row["longitude"])+", "+str(row["cdChamado"])+", "+str(row["idUnidade"])+","+
-						str(usuario_atend_default)+", 'N', 'N', 'F', "+str(ponto_apoio_default)+");")
+						str(usuario_atend_default)+", 'N', 'N', 'F', "+str(ponto_apoio_default)+",'"+bandeira+"');")
 			except Exception as e:
 				print(e)
 		else:
@@ -166,8 +167,8 @@ def insert_data_in_db(rows, server, ponto_apoio_default, usuario_atend_default):
 			# In case of call was Canceled and will be Finalized
 			if (chamada_duplicada[0][9]=='C') and (row["situacao"]=='P'):
 				cursor.execute("UPDATE chamadas SET situacao='"+row["situacao"]+' WHERE "idUnidade"='+str(row["idUnidade"])+");")
-			else:
-				print("Chamado "+str(row['cdChamado'])+" duplicado não foi inserido.")
+			#else:
+			#	print("Chamado "+str(row['cdChamado'])+" duplicado não foi inserido.")
 
 	conn.commit()
 	conn.close()
@@ -176,7 +177,10 @@ def insert_data_in_db(rows, server, ponto_apoio_default, usuario_atend_default):
 	save_last_date(max_data)
 
 def get_hour_from_date(date):
-	return str(date.hour)+str(date.minute)+str(date.second)
+	hour = str(date.hour) if len(str(date.hour))>1 else "0"+str(date.hour)
+	minute = str(date.minute) if len(str(date.minute))>1 else "0"+str(date.minute)
+	second = str(date.second) if len(str(date.second))>1 else "0"+str(date.second)
+	return hour+minute+second
 
 def get_id_unidade(placa, server):
 	try:
@@ -276,7 +280,50 @@ def get_chamada(server, taxi_digital_id):
 	cursor.execute("SELECT * from chamadas where id_chamado_digital="+taxi_digital_id+";")
 	row = [r for r in cursor]
 	return row
-        
+
+def get_bandeira(destiny, date, horamin):
+        month = str(date.month) if len(str(date.month))>1 else "0"+str(date.month)
+        day = str(date.day) if len(str(date.day))>1 else "0"+str(date.day)
+
+        intervals = get_bandeira2_intervalos(destiny)
+        # Hollydays or sundays
+        if is_hollyday(day+month, destiny) or date.weekday()==7:
+                if intervals["domfer"][:4] < horamin and horamin < intervals["domfer"][4:]: return "2"
+                else: return "1"
+        else:
+                # In case of be a day of week
+                if date.weekday()<5:
+                        if intervals["segsex"]["intervalo1"][:4] < horamin and horamin < intervals["segsex"]["intervalo1"][4:]: return "2"
+                        if intervals["segsex"]["intervalo2"][:4] < horamin and horamin < intervals["segsex"]["intervalo2"][4:]: return "2"
+                        return "1"
+                # In case of be a weekend day
+                else:
+                        if intervals["sabado"]["intervalo1"][:4] < horamin and horamin < intervals["sabado"]["intervalo1"][4:]: return "2"
+                        if intervals["sabado"]["intervalo2"][:4] < horamin and horamin < intervals["sabado"]["intervalo2"][4:]: return "2"
+                        return "1"
+
+def get_bandeira2_intervalos(server):
+        conn = get_connection(server)
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM bandeiras")
+        rows = [r for r in cursor]
+        return {"segsex": {"intervalo1": rows[0][0][:8], "intervalo2": rows[0][0][8:]},
+                "sabado": {"intervalo1": rows[0][1][:8], "intervalo2": rows[0][1][8:]},
+                "domfer": rows[0][2]}
+
+def is_hollyday(date, server):
+        conn = get_connection(server)
+        cursor = conn.cursor()
+        cursor.execute("SELECT data FROM feriados WHERE data='"+date+"'")
+        if len([r for r in cursor])>0: return True
+        else: return False
+
+
 if __name__ == "__main__":
  	main()
 #configs = load_config()
+#last_date = load_last_date()
+#origin = configs["server-origin"]
+#destiny = configs["server-destiny"]
+#data = get_data_from_view(last_date, origin)
+#mapped_data = map_data(data, destiny)

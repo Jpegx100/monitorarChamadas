@@ -13,7 +13,7 @@
 	    <database>liguetaxi</database>
 	</server-destiny>
 
-	<time-to-update>2</time-to-update>
+	<time-to-update>10</time-to-update>
 	<default-pa>1</default-pa>
 	<default-user>1</default-user>
 </config>
