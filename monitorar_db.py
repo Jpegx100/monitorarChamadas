@@ -10,25 +10,34 @@ def main():
 			last_date, configs['default-pa'], configs['default-user'])
         
 def update_database(server_origin, server_destiny, time_to_update, last_date, default_pa, default_user):
-	data = get_data_from_view(last_date, server_origin)
-	ids = [r['cdChamado'] for r in data]
-	print(str(len(ids))+" Chamadados encontrados")
+	try:
+		data = get_data_from_view(last_date, server_origin)
+		ids = [r['cdChamado'] for r in data]
 	
-	mapped_data = map_data(data, server_destiny)
-	ids = [r['cdChamado'] for r in mapped_data]
-	datas = [int(r['dtOver'].strftime("%s"))*1000 for r in mapped_data]
-	print(str(len(ids))+" Chamadados validos")
-	#print("Datas: "+str(datas))
+		try:
+			print(str(len(ids) - 1)+" Chamadados encontrados")
+		except Exception as e:
+			print("0 Chamadas encontrados")
 	
-	insert_data_in_db(mapped_data, server_destiny, default_pa, default_user)
-	new_last_date = max_date(mapped_data, 'dtOver')
-	save_last_date(new_last_date)
-	#print("Maior data: "+str(new_last_date))
-	print("CONCLUIDO CICLO")
-	new_last_date = datetime.fromtimestamp(int(new_last_date) / 1000.0)
+		mapped_data = map_data(data, server_destiny)
+		ids = [r['cdChamado'] for r in mapped_data]
+		datas = [int(r['dtOver'].strftime("%s"))*1000 for r in mapped_data]
+		# print(str(len(ids))+" Chamadados validos")
+		#print("Datas: "+str(datas))
+	
+		insert_data_in_db(mapped_data, server_destiny, default_pa, default_user)
+		new_last_date = max_date(mapped_data, 'dtOver')
+		save_last_date(new_last_date)
+		#print("Maior data: "+str(new_last_date))
+		#print("CONCLUIDO CICLO")
+		new_last_date = datetime.fromtimestamp(int(new_last_date) / 1000.0)
+		threading.Timer(time_to_update, update_database, [server_origin, server_destiny, time_to_update, new_last_date, default_pa, default_user]).start()
 
-	#print(get_last_id_from_view(server_origin))
-	threading.Timer(time_to_update, update_database, [server_origin, server_destiny, time_to_update, new_last_date, default_pa, default_user]).start()
+		#print(get_last_id_from_view(server_origin))
+	except Exception as e:
+		print("-")
+		threading.Timer(time_to_update, update_database, [server_origin, server_destiny, time_to_update, last_date, default_pa, default_user]).start()
+	
 
 def max_date(rows, key):
 	bigger = 0
@@ -144,18 +153,18 @@ def insert_data_in_db(rows, server, ponto_apoio_default, usuario_atend_default):
 				if row["dataCanc"]!=None:                                                
 					cursor.execute("INSERT INTO chamadas("+fields+', "dataCanc", "horaCanc"' +") VALUES ("+chamada_id+","+
 						row["fone"]+",'"+row["nome"]+"','"+row["logradouro"]+"','"+row["referencia"]+"',"+
-						row["dataChamada"].strftime("'%Y-%m-%d'")+","+row["horaChamada"]+","+
-                                                row["dataSolicitacao"].strftime("'%Y-%m-%d'")+","+row["horaSolicitacao"]+",'"+
+						row["dataChamada"].strftime("'%Y-%m-%d'")+",'"+row["horaChamada"]+"',"+
+                                                row["dataSolicitacao"].strftime("'%Y-%m-%d'")+",'"+row["horaSolicitacao"]+"','"+
 						row["complemento"]+"','"+row["bairro"]+"','"+row["situacao"]+"',"+str(row["latitude"])+","+
 						str(row["longitude"])+", "+str(row["cdChamado"])+", "+str(row["idUnidade"])+","+
-						str(usuario_atend_default)+", 'N', 'N', 'F', "+str(ponto_apoio_default)+",'"+bandeira+"','"+str(row["dataCanc"])+"',"+
-						row["horaCanc"]+");")
+						str(usuario_atend_default)+", 'N', 'N', 'F', "+str(ponto_apoio_default)+",'"+bandeira+"','"+str(row["dataCanc"])+"','"+
+						row["horaCanc"]+"');")
 				# In case of call been finalized
 				else:                                            
 					cursor.execute("INSERT INTO chamadas("+fields+") VALUES ("+chamada_id+","+
 						row["fone"]+",'"+row["nome"]+"','"+row["logradouro"]+"','"+row["referencia"]+"',"+
-						row["dataChamada"].strftime("'%Y-%m-%d'")+","+row["horaChamada"]+","+
-                                                row["dataSolicitacao"].strftime("'%Y-%m-%d'")+","+row["horaSolicitacao"]+",'"+
+						row["dataChamada"].strftime("'%Y-%m-%d'")+",'"+row["horaChamada"]+"',"+
+                                                row["dataSolicitacao"].strftime("'%Y-%m-%d'")+",'"+row["horaSolicitacao"]+"','"+
 						row["complemento"]+"','"+row["bairro"]+"','"+row["situacao"]+"',"+str(row["latitude"])+","+
 						str(row["longitude"])+", "+str(row["cdChamado"])+", "+str(row["idUnidade"])+","+
 						str(usuario_atend_default)+", 'N', 'N', 'F', "+str(ponto_apoio_default)+",'"+bandeira+"');")
@@ -173,14 +182,14 @@ def insert_data_in_db(rows, server, ponto_apoio_default, usuario_atend_default):
 	conn.commit()
 	conn.close()
 	max_data = max_date(rows, "dtOver")
-	print(max_data)
 	save_last_date(max_data)
 
 def get_hour_from_date(date):
 	hour = str(date.hour) if len(str(date.hour))>1 else "0"+str(date.hour)
 	minute = str(date.minute) if len(str(date.minute))>1 else "0"+str(date.minute)
 	second = str(date.second) if len(str(date.second))>1 else "0"+str(date.second)
-	return hour+minute+second
+	hms = hour+minute+second
+	return hms
 
 def get_id_unidade(placa, server):
 	try:
@@ -208,16 +217,17 @@ def map_data(rows, server):
 			new_row = {}
 			num_unidade = get_id_unidade(r['dsPlaca'], server)
 			if(num_unidade!=None and r['dtChamado'] and r['dtCadastro']):
+				hora_ch = get_hour_from_date(r['dtChamado']) if r['dtChamado'] else None
 				new_row['fone'] = r['nrTelefone'] if len(r['nrTelefone'])<=11 else r['nrTelefone'][:11]
-				new_row['nome'] = r['dsNomeSolicitante']
+				new_row['nome'] = r['dsNomeSolicitante'] if len(r['dsNomeSolicitante'])<=50 else r['dsNomeSolicitante'][:50]
 				new_row['logradouro'] = r['dsLogradouroOrigem'] if len(r['dsLogradouroOrigem'])<=70 else r['dsLogradouroOrigem'][:70]
 				new_row['referencia'] = r['dsReferenciaOrigem'] if len(r['dsReferenciaOrigem'])<=60 else r['dsReferenciaOrigem'][:60]
 				new_row['dataChamada'] = r['dtChamado'].date()
-				new_row['horaChamada'] = get_hour_from_date(r['dtChamado']) if r['dtChamado'] else None
+				new_row['horaChamada'] = hora_ch
 				new_row['dataSolicitacao'] = r['dtCadastro'].date()
 				new_row['horaSolicitacao'] = get_hour_from_date(r['dtCadastro']) if r['dtCadastro'] else None
-				new_row['complemento'] = r['dsComplementoOrigem']
-				new_row['bairro'] = r['dsBairroOrigem']
+				new_row['complemento'] = r['dsComplementoOrigem'] if len(r['dsComplementoOrigem'])<=80 else r['dsComplementoOrigem'][:80]
+				new_row['bairro'] = r['dsBairroOrigem'] if len(r['dsBairroOrigem'])<=50 else r['dsBairroOrigem'][:50]
 				new_row['situacao'] = parse_Situation(r['dsStatus'])
 				new_row['latitude'] = r['nrLatOrigem']
 				new_row['longitude'] = r['nrLngOrigem']
