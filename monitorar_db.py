@@ -103,7 +103,7 @@ def get_data_from_view(last_date, server):
 		fields = "nrTelefone, dsNomeSolicitante, dsLogradouroOrigem, dsReferenciaOrigem, "+\
 			"dsComplementoOrigem, dsBairroOrigem, nrLatOrigem, nrLngOrigem, cdChamado, "+\
 			"dtChamado, dtCancelamento, dtCadastro, dsStatus, dsPlaca, dtFinal, nrChamado"
-		select_query = "SELECT "+fields+" FROM [taxidigital_oaz].[dbo].[300_VwLstChamado] WHERE "
+		select_query = "SELECT TOP 150 "+fields+" FROM [taxidigital_oaz].[dbo].[300_VwLstChamado] WHERE "
 		queryCance = select_query+"dsStatus='Cancelado' AND dtCancelamento IS NOT NULL AND CAST(dtCancelamento AS DATETIME) > '"+date_str+"'"
 		queryFinal = select_query+"dsStatus='Final' AND dtFinal IS NOT NULL AND CAST(dtFinal AS DATETIME) > '"+date_str+"'"
 		
@@ -148,7 +148,9 @@ def insert_data_in_db(rows, server, ponto_apoio_default, usuario_atend_default):
 	fields = 'id, fone, nome, logradouro, referencia, "dataChamada", "horaChamada", "dataSolicitacao",'+\
 			'"horaSolicitacao", complemento, bairro, situacao, latitude, longitude, "id_chamado_digital", "idUnidade", ' +\
 			' "idUsuarioAtend", solicitada, passagem, status, "idPontoApoio", bandeira'
+	i = 0
 	for row in rows:
+		i = i+1
 		if(not id_chamada_duplicada(server, str(row["cdChamado"]))):
 			try:
 				chamada_id = str(get_next_chamada_id(server))
@@ -182,7 +184,7 @@ def insert_data_in_db(rows, server, ponto_apoio_default, usuario_atend_default):
 				cursor.execute("UPDATE chamadas SET situacao='"+row["situacao"]+' WHERE "idUnidade"='+str(row["idUnidade"])+");")
 			#else:
 			#	print("Chamado "+str(row['cdChamado'])+" duplicado não foi inserido.")
-
+		print(str(i)+" inserted of "+str(len(rows)))
 	conn.commit()
 	conn.close()
 	# max_data = max_date(rows, "dtOver")
