@@ -10,6 +10,7 @@ def main():
 			last_date, configs['default-pa'], configs['default-user'])
         
 def update_database(server_origin, server_destiny, time_to_update, last_date, default_pa, default_user):
+
 	data = get_data_from_view(last_date, server_origin)
 	ids = [r['cdChamado'] for r in data]
 	
@@ -128,6 +129,7 @@ def get_next_chamada_id(server):
 		row = [r for r in cursor]
 		if len(row)>0:
 			return row[0][0]
+		conn.close()
 	except Exception as e:
 		print(e)
 	return None
@@ -255,8 +257,8 @@ def id_chamada_duplicada(server, taxi_digital_id):
 		cursor = conn.cursor()
 		cursor.execute("SELECT id_chamado_digital from chamadas where id_chamado_digital="+taxi_digital_id+";")
 		row = [r for r in cursor]
+		conn.close()
 		if len(row)>0:
-			conn.close()
 			return True
 	except Exception as e:
 		print(e)
@@ -271,7 +273,9 @@ def get_last_id_from_view(server):
 	)
 	cursor = conn.cursor()
 	cursor.execute("SELECT MAX(cdChamado) FROM [taxidigital_oaz].[dbo].[300_VwLstChamado]")
-	return cursor.fetchone()
+	row = cursor.fetchone()
+	conn.close()
+	return 
 
 def show(data):
 	for x in data:
@@ -282,6 +286,7 @@ def get_chamada(server, taxi_digital_id):
 	cursor = conn.cursor()
 	cursor.execute("SELECT * from chamadas where id_chamado_digital="+taxi_digital_id+";")
 	row = [r for r in cursor]
+	conn.close()
 	return row
 
 def get_bandeira(destiny, date, horamin):
@@ -310,6 +315,7 @@ def get_bandeira2_intervalos(server):
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM bandeiras")
         rows = [r for r in cursor]
+        conn.close()
         return {"segsex": {"intervalo1": rows[0][0][:8], "intervalo2": rows[0][0][8:]},
                 "sabado": {"intervalo1": rows[0][1][:8], "intervalo2": rows[0][1][8:]},
                 "domfer": rows[0][2]}
@@ -318,7 +324,10 @@ def is_hollyday(date, server):
         conn = get_connection(server)
         cursor = conn.cursor()
         cursor.execute("SELECT data FROM feriados WHERE data='"+date+"'")
-        if len([r for r in cursor])>0: return True
+        rows = [r for r in cursor]
+        conn.close()
+        if len(rows)>0: 
+        	return True
         else: return False
 
 
