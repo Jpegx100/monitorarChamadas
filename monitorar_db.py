@@ -12,32 +12,31 @@ def main():
 def update_database(server_origin, server_destiny, time_to_update, last_date, default_pa, default_user):
 	try:
 		data = get_data_from_view(last_date, server_origin)
-		ids = [r['cdChamado'] for r in data]
-	
 		try:
-			print(str(len(ids) - 1)+" Chamadados encontrados")
+			print(str(len(data) - 1)+" Chamadados encontrados")
 		except Exception as e:
 			print("0 Chamadas encontrados")
-	
 		mapped_data = map_data(data, server_destiny)
-		ids = [r['cdChamado'] for r in mapped_data]
-		datas = [int(r['dtOver'].strftime("%s"))*1000 for r in mapped_data]
-		# print(str(len(ids))+" Chamadados validos")
-		#print("Datas: "+str(datas))
-	
-		insert_data_in_db(mapped_data, server_destiny, default_pa, default_user)
+		if(len(mapped_data)<=100):
+			insert_data_in_db(mapped_data, server_destiny, default_pa, default_user)
+		else:
+			for rows in slice(mapped_data, 100):
+				insert_data_in_db(mapped_data, server_destiny, default_pa, default_user)
+				print("Slice inserted")
+		
 		new_last_date = max_date(mapped_data, 'dtOver')
 		save_last_date(new_last_date)
-		#print("Maior data: "+str(new_last_date))
-		#print("CONCLUIDO CICLO")
 		new_last_date = datetime.fromtimestamp(int(new_last_date) / 1000.0)
 		threading.Timer(time_to_update, update_database, [server_origin, server_destiny, time_to_update, new_last_date, default_pa, default_user]).start()
 
-		#print(get_last_id_from_view(server_origin))
 	except Exception as e:
-		print("-")
+		print(e)
+		print("Reiniciando servico")
 		threading.Timer(time_to_update, update_database, [server_origin, server_destiny, time_to_update, last_date, default_pa, default_user]).start()
-	
+
+def slice(l, n):
+	for i in range(0, len(l), n):
+		yield l[i:i+n]
 
 def max_date(rows, key):
 	bigger = 0
@@ -99,26 +98,30 @@ def load_last_date():
 
 def get_data_from_view(last_date, server):
 	'''Connect to VIEW'''
-	date_str = str(last_date)
-	fields = "nrTelefone, dsNomeSolicitante, dsLogradouroOrigem, dsReferenciaOrigem, "+\
+	try:
+		date_str = str(last_date)
+		fields = "nrTelefone, dsNomeSolicitante, dsLogradouroOrigem, dsReferenciaOrigem, "+\
 			"dsComplementoOrigem, dsBairroOrigem, nrLatOrigem, nrLngOrigem, cdChamado, "+\
-			"dtChamado, dtCancelamento, dtCadastro, dsStatus, dsPlaca, dtFinal"
-	select_query = "SELECT "+fields+" FROM [taxidigital_oaz].[dbo].[300_VwLstChamado] WHERE "
-	queryCance = select_query+"dsStatus='Cancelado' AND dtCancelamento IS NOT NULL AND CAST(dtCancelamento AS DATETIME) > '"+date_str+"'"
-	queryFinal = select_query+"dsStatus='Final' AND dtFinal IS NOT NULL AND CAST(dtFinal AS DATETIME) > '"+date_str+"'"
-	
-	conn = pymssql.connect(
-	    host=server['ip'],
-	    user=server['user'],
-	    password=server['password'],
-	    database=server['database']
-	)
-	cursor = conn.cursor(as_dict=True)
-	cursor.execute(queryCance+" UNION "+queryFinal)
-	rows = [r for r in cursor]
-	conn.close()
+			"dtChamado, dtCancelamento, dtCadastro, dsStatus, dsPlaca, dtFinal, nrChamado"
+		select_query = "SELECT "+fields+" FROM [taxidigital_oaz].[dbo].[300_VwLstChamado] WHERE "
+		queryCance = select_query+"dsStatus='Cancelado' AND dtCancelamento IS NOT NULL AND CAST(dtCancelamento AS DATETIME) > '"+date_str+"'"
+		queryFinal = select_query+"dsStatus='Final' AND dtFinal IS NOT NULL AND CAST(dtFinal AS DATETIME) > '"+date_str+"'"
+		
+		conn = pymssql.connect(
+		    host=server['ip'],
+		    user=server['user'],
+		    password=server['password'],
+		    database=server['database']
+		)
+		cursor = conn.cursor(as_dict=True)
+		cursor.execute(queryCance+" UNION "+queryFinal)
+		rows = [r for r in cursor]
+		conn.close()
 
-	return rows
+		return rows
+	except Exception as e:
+		print(e)
+		print("\n"+queryFinal+"\n")
 
 def get_connection(server):
 	conn_string = "host="+server['ip']+" dbname="+server['database']+" user="+server['user']+" password="+server['password']
@@ -182,8 +185,8 @@ def insert_data_in_db(rows, server, ponto_apoio_default, usuario_atend_default):
 
 	conn.commit()
 	conn.close()
-	max_data = max_date(rows, "dtOver")
-	save_last_date(max_data)
+	# max_data = max_date(rows, "dtOver")
+	# save_last_date(max_data)
 
 def get_hour_from_date(date):
 	hour = str(date.hour) if len(str(date.hour))>1 else "0"+str(date.hour)
@@ -213,7 +216,10 @@ def parse_Situation(situation):
 
 def map_data(rows, server):
 	new_rows = []
+	i = 0
 	for r in rows:
+		i = i+1
+		print("Mapped "+str(i)+" of "+str(len(rows)))
 		try:
 			new_row = {}
 			num_unidade = get_id_unidade(r['dsPlaca'], server)
@@ -233,7 +239,7 @@ def map_data(rows, server):
 				new_row['latitude'] = r['nrLatOrigem']
 				new_row['longitude'] = r['nrLngOrigem']
 				new_row['idUnidade'] = num_unidade
-				new_row['cdChamado'] = r['cdChamado']
+				new_row['cdChamado'] = r['nrChamado']
 
 				if('dtCancelamento' in r.keys() and r['dtCancelamento']):
 					new_row['dataCanc'] = r['dtCancelamento'].date()
