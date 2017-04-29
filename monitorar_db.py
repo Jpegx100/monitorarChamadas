@@ -102,21 +102,21 @@ def map_data(rows, server):
 					continue
 			else:
 				if r['dtChamado']==None:
-					print("Data do chamado não encontrada ")
+					print("Data do chamado nao encontrada ")
 					j = j+1
 					continue
 				if r['dtCadastro']==None:
-					print("Data do cadsatro não encontrada ")
+					print("Data do cadsatro nao encontrada ")
 					j = j+1
 					continue
 				if r['dsSiglaMoto']==None:
-					print("dsSiglaMoto não existe")
+					print("dsSiglaMoto nao existe")
 					j = j+1
 					continue
 
 		except Exception as e:
 			print(str(e))
-	print("Chamadas não incluidas: "+str(j))
+	print("Chamadas nao incluidas: "+str(j))
 	return new_rows
 
 def insert_data_in_db(rows, server, ponto_apoio_default, usuario_atend_default):
@@ -156,17 +156,17 @@ def insert_data_in_db(rows, server, ponto_apoio_default, usuario_atend_default):
 				except Exception as e:
 					print(e)
 			else:
-				print("Unidade "+str(row['idUnidade'])+" não cadastrada no banco local")
+				print("Unidade "+str(row['idUnidade'])+" nao cadastrada no banco local")
 		else:
 			if row["idUnidade"]==None:
-				print("Chamada não incluida por não possuir idUnidade")
+				print("Chamada nao incluida por nao possuir idUnidade")
 			chamada_duplicada = get_chamada(server, str(row["cdChamado"]))
 			# In case of call was Canceled and will be Finalized
 			if (chamada_duplicada[0][9]=='C') and (row["situacao"]=='P'):
 				if(exist_unidade(server, str(row['idUnidade']))):
 					cursor.execute("UPDATE chamadas SET situacao='"+row['situacao']+"', 'idUnidade'="+row['idUnidade']+" WHERE 'id_chamado_digital'="+str(row['cdChamado'])+");")
 			#else:
-			#	print("Chamado "+str(row['cdChamado'])+" duplicado não foi inserido.")
+			#	print("Chamado "+str(row['cdChamado'])+" duplicado nao foi inserido.")
 		print(str(i)+" inserted of "+str(len(rows)))
 	conn.commit()
 	conn.close()
