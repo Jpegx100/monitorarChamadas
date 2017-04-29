@@ -57,6 +57,7 @@ def get_data_from_view(last_date, server):
 
 def map_data(rows, server):
 	new_rows = []
+	#Teste
 	j = 0
 	i = 0
 	for r in rows:
@@ -129,7 +130,7 @@ def insert_data_in_db(rows, server, ponto_apoio_default, usuario_atend_default):
 	for row in rows:
 		i = i+1
 		id_chamada = str(get_next_chamada_id(server))
-		if(row["idUnidade"] and not id_chamada_duplicada(server, str(row["idUnidade"]))):
+		if(row["idUnidade"] and not id_chamada_duplicada(server, str(row["cdChamado"]))):
 			if(exist_unidade(server, str(row['idUnidade']))):
 				try:
 					bandeira = get_bandeira(server, row["dataChamada"], row["horaSolicitacao"][:4])
@@ -160,10 +161,10 @@ def insert_data_in_db(rows, server, ponto_apoio_default, usuario_atend_default):
 			if row["idUnidade"]==None:
 				print("Chamada não incluida por não possuir idUnidade")
 			chamada_duplicada = get_chamada(server, str(row["cdChamado"]))
-			chamada_id = get_next_chamada_id(server)
 			# In case of call was Canceled and will be Finalized
 			if (chamada_duplicada[0][9]=='C') and (row["situacao"]=='P'):
-				cursor.execute("UPDATE chamadas SET situacao='"+row['situacao']+"' WHERE 'idUnidade'="+str(chamada_id)+");")
+				if(exist_unidade(server, str(row['idUnidade']))):
+					cursor.execute("UPDATE chamadas SET situacao='"+row['situacao']+"', 'idUnidade'="+row['idUnidade']+" WHERE 'id_chamado_digital'="+str(row['cdChamado'])+");")
 			#else:
 			#	print("Chamado "+str(row['cdChamado'])+" duplicado não foi inserido.")
 		print(str(i)+" inserted of "+str(len(rows)))
